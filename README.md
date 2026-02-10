@@ -30,38 +30,25 @@ Sales were split into three periods:
 - **Visual Studio Code:** My main environment for writing and organizing SQL and Python files.
 
 ## Power BI Dashboard
-[View Interactive Power BI Dashboard](https://app.powerbi.com/groups/me/reports/cac760c2-e0f3-40d9-8c77-4426f9cd8cc0/fff278654c1dba434367?ctid=d2028c43-df44-4ef6-9b89-67a339c53d23&experience=power-bi)
+![](dashboard_overview.gif)
+[:bar_chart: View Interactive Power BI Dashboard](https://app.powerbi.com/view?r=eyJrIjoiYmI4OTIwMTMtOThhYi00MGRlLTlmNTktZjQ4NTEwODcwN2M3IiwidCI6ImQyMDI4YzQzLWRmNDQtNGVmNi05Yjg5LTY3YTMzOWM1M2QyMyJ9&pageName=fff278654c1dba434367)
 
 ## The Analysis
 Each query in this project is tied to a specific business question. The goal was not just to show what changed, but to explain how and why it changed.
 
 ### Descriptive Analysis (What is happening?)
-**1. Daily Revenue & Average Transaction Value**  
+**1. Transaction Value Distribution**  
 
-To check consistency at the day level, I looked at daily revenue and average bill size.
+To understand baseline purchase behavior, I measured the average, minimum, and maximum bill values.
 
 ```sql
-WITH daily_sales AS (
-    SELECT
-        s.date,
-        p.period_name AS period,
-        p.period_order,
-        SUM(s.total_amt) AS daily_sales,
-        COUNT(*) AS daily_transaction_count
-    FROM sales s
-    JOIN vw_period p ON s.date = p.date
-    GROUP BY 1,2,3
-)
-
-SELECT period,
-       AVG(daily_sales) AS avg_daily_sales,
-       AVG(daily_transaction_count) AS avg_daily_transactions
-FROM daily_sales
-GROUP BY period, period_order
-ORDER BY period_order;
+SELECT AVG(total_amt) avg_transaction_value,
+       MIN(total_amt) min_transaction_value,
+       MAX(total_amt) max_transaction_value
+FROM sales s;
 ```
 
-After closure, the daily revenue distribution shifts upward across normal days, not just a few outliers. This suggests the uplift was broad‑based, meaning more customers were coming in consistently rather than a handful of unusually large days driving the results.
+The average transaction value is ~₹280, with a minimum of ₹5 and a maximum of ₹2,260. This wide range shows that while a few large baskets occur, most purchases are small. The low average compared to the max confirms the store’s core business is built on frequent, low‑value transactions rather than occasional high‑value bills.
 
 
 **2. Monthly Revenue Trend**  
@@ -69,26 +56,18 @@ After closure, the daily revenue distribution shifts upward across normal days, 
 To identify long‑term shifts, I analyzed revenue by month across two years.
 
 ```sql
-WITH monthly_sales AS (
-    SELECT DATE_TRUNC('month', s.date) AS month,
-           p.period_name AS period,
-           p.period_order, 
-           SUM(s.total_amt) AS monthly_sales,
-           COUNT(*) AS monthly_transaction_count
-    FROM sales s
-    JOIN vw_period p ON s.date = p.date
-    GROUP BY 1,2,3
-)
-
-SELECT period,
-       AVG(monthly_sales) AS avg_monthly_sales,
-       AVG(monthly_transaction_count) AS avg_monthly_transactions
-FROM monthly_sales
-GROUP BY 1, period_order
-ORDER BY period_order;
+SELECT DATE_TRUNC('month', date) AS month,
+       SUM(total_amt) as total_amt_monthly,
+       COUNT(*) AS transaction_count
+FROM sales
+GROUP BY 1
+ORDER BY 1;
 ```
 
-The trend declines through 2024 and then rises sharply starting April 2025. This timing aligns precisely with the competitor closure and breaks the previous downward pattern. That timing makes it unlikely that the jump was random noise or seasonal fluctuation; it looks like an event‑driven shift.
+Looking at total monthly revenue across 2024–2025, the series shows a lower, declining band through 2024, followed by a clear jump beginning in April 2025. The highest monthly totals in the entire dataset appear in 2025, and the lift is sustained across multiple months rather than being a one‑time spike. That shift is visible directly in the month‑to‑month totals.
+
+![Monthly Revenue Trend](monthly_revenue_trend.png)
+*Image showing total monthly revenue across 2024–2025 with a trend line highlighting the shift in sales levels. Generated using Power BI.*
 
 
 ### Diagnostic Analysis (How is it happening?)
@@ -123,7 +102,7 @@ GROUP BY period_name, period_order
 ORDER BY period_order;
 ```
 
-The closure period shows a clear rise in daily transactions, while average bill size also increases but at a smaller scale. This indicates the uplift was primarily volume‑led. After reopening, transaction volume drops slightly, but higher average bill values remain, which helps keep revenue elevated even as some customers return to the competitor. The pattern reinforces that the store’s health depends more on consistent footfall than unusually large baskets.
+Average daily transactions rose from ~12.2 (pre‑closure) to ~16.6 (post‑closure), while average bill value increased from ~₹228.6 to ~₹351.9. After reopening, transactions fell to ~14.4 but average bill value stayed high at ~₹379.7, keeping revenue elevated. The pattern indicates the initial lift was volume‑led, while higher basket value helped sustain revenue after competition returned.
 
 
 **4. Weekday vs. Weekend Effect**  
@@ -156,7 +135,7 @@ GROUP BY period_name, period_order, day_type
 ORDER BY period_order, day_type;
 ```
 
-Weekdays improved significantly after closure, which is a stronger signal of routine customer adoption. If growth were only weekend‑driven, it would suggest bulk or occasional visits; the weekday uplift indicates that many customers shifted their daily convenience shopping to this store.
+Before closure, weekdays averaged ₹2,482 and weekends ₹3,089 in daily sales. After closure, both nearly doubled with weekdays being ~₹5,398 and weekends ~₹6,442. Post‑opening, weekdays held at ~₹5,015 and weekends at ~₹6,185. The uplift is not just a weekend effect; weekday sales also climbed sharply, showing routine customers shifted their regular shopping behavior.
 
 
 ### Impact / Retention Analysis (What changed after events?)
@@ -189,7 +168,7 @@ GROUP BY 1, period_order
 ORDER BY period_order
 ;
 ```
-Mean and median stayed close in the uplift period, indicating the increase was steady across days rather than driven by outliers. Volatility remained controlled even as revenue rose, which is a strong sign that the uplift reflects a structural shift rather than noise.
+Pre‑closure daily sales averaged ~₹2,658, with a median of ₹2,559 and standard deviation of ₹1,077. Post‑closure, the mean rose to ~₹5,691 and the median to ₹5,644, with volatility at ~₹1,238. Post‑opening, the mean stayed high at ~₹5,353, median ₹5,201, and volatility ~₹1,169. The mean and median remain close across periods, and volatility doesn’t spike, confirming the uplift is steady and structural rather than driven by a few outlier days.
 
 
 **6. Retention of Captured Revenue**  
@@ -238,12 +217,15 @@ SELECT
 FROM pivot;
 ```
 
-A meaningful share of the post‑closure uplift remained after the competitor returned, showing that the store converted a portion of new shoppers into retained customers instead of losing all gains.
+The post‑closure uplift over the pre‑closure baseline was ~₹3,033 per day. After reopening, only ~₹338 per day of that uplift was lost, which implies ~88.9% of the uplift was retained. This indicates that most of the customers gained during the closure continued shopping even after the competitor returned.
 
 
 ### Predictive Analysis (What would have happened without the events?)
-A baseline model trained on pre‑closure data projects expected sales after April 2025 if no competitor changes occurred. Actual revenue stays far above this projected baseline across the event period, confirming that the uplift was not just seasonal drift but a true competitor‑driven impact.
-![Actual vs Counterfactual](actual_vs_counterfactual.png)
+After the competitor closed, actual daily sales moved sharply above the expected baseline (red dashed line), and the 7‑day trend (dark blue) stayed elevated for the rest of the period. The gap between actuals (blue) and the baseline remained wide across months, which points to a durable uplift rather than a short‑lived spike. Even after the new competitor opened, sales stayed well above the projected baseline, showing that a large share of the gained demand persisted.
+
+![Counterfactual Baseline](actual_vs_counterfactual.png)
+*Image showing daily revenue across the full timeline alongside the counterfactual baseline and event markers for competitor closure and reopening. Generated using Power BI.*
+
 
 
 ## What I Learned
